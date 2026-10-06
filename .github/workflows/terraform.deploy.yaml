@@ -1,0 +1,65 @@
+name: Terraform Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+
+      operation:
+        description: "Choose Terraform operation"
+        required: true
+        type: choice
+        options:
+          - apply
+          - destroy
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  terraform-deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan - Apply
+        if: inputs.operation == 'apply'
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        if: inputs.operation == 'apply'
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Plan - Destroy
+        if: inputs.operation == 'destroy'
+        run: terraform plan -destroy -out=destroy.tfplan
+
+      - name: Terraform Destroy
+        if: inputs.operation == 'destroy'
+        run: terraform apply -auto-approve destroy.tfplan
